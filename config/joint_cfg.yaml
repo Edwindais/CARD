@@ -1,0 +1,3 @@
+defaults:
+  - dataset: acdc_nnunet_dataset
+  - model: joint_model

@@ -1,0 +1,42 @@
+diffusion_type: categorical
+denoising_fn: swin_unetr
+swinunetr_type: base
+swinunetr_kwargs: {}
+
+results_folder: EXP/
+results_folder_postfix: acdc_swinunetr
+load_milestone: false
+
+sample_mode: one_hot
+train_stochastic: true
+inference_stochastic: false
+categorical_final_step_mode: majority
+noise_std: 0.0
+
+categorical_aux_loss_type: dice_ce
+categorical_aux_loss_weight: 1.0
+categorical_aux_dice_weight: 0.5
+categorical_aux_ce_weight: 0.5
+categorical_aux_boundary_weight: 0.1
+categorical_kl_loss_weight: 0.1
+categorical_ignore_index: -1
+cfg_condition_mask_ratio: 0.2
+
+train_lr: 1e-4
+train_num_steps: 100000
+save_and_sample_every: 1000
+gradient_accumulate_every: 2
+max_grad_norm: 1.0
+ema_decay: 0.995
+amp: false
+gpus: 0
+
+timesteps: 50
+sampler: categorical
+sampling_steps: 5
+
+vis_num_slices: 3
+vis_max_samples: 2
+vis_overlay_alpha: 0.45
+vis_slices: null
+max_val_batches: 1

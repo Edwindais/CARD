@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "candidate_id": "source_validation_response_noise_heavy",
+  "family": "source_validation",
+  "selection_use": "source-validation parameter selection only",
+  "description": "Source-validation MRI augmentation using contrast, gamma, and additive Gaussian receiver noise.",
+  "ops": ["contrast", "gamma", "gaussian_noise"],
+  "forbidden_test_operators": ["spatial_bias_field", "motion", "ghosting", "kspace_spike"],
+  "conditions": {
+    "clean": {
+      "preset": null,
+      "contrast": [1.0, 1.0],
+      "gamma_range": [1.0, 1.0],
+      "noise_std": 0.0
+    },
+    "low": {
+      "preset": "source_validation_low",
+      "contrast": [0.9, 1.1],
+      "gamma_range": [0.9, 1.1],
+      "noise_std": 0.01
+    },
+    "medium": {
+      "preset": "source_validation_medium",
+      "contrast": [0.85, 1.18],
+      "gamma_range": [0.85, 1.18],
+      "noise_std": 0.03
+    },
+    "response-noise-heavy": {
+      "preset": "source_validation_response_noise_heavy",
+      "contrast": [0.85, 1.18],
+      "gamma_range": [0.85, 1.18],
+      "noise_std": 0.04
+    }
+  },
+  "implementation_source": "dataset/acdc_c_torchio_dataset.py::PHOTOMETRIC_PRESETS"
+}

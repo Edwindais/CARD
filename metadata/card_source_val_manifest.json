@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "name": "CARD cardiac source-validation parameter-selection manifest",
+  "selection_role": "card_parameter_selection",
+  "augmentation_family": "source_validation",
+  "selection_objective": "equal mean of ROI-NLL across clean, low, medium, and response-noise-heavy conditions",
+  "roi_sample_mode": "slice2d_kernel10_external",
+  "datasets": {
+    "acdc": {
+      "expected_case_ids": [
+        "ACDC_002_ED", "ACDC_002_ES", "ACDC_019_ED", "ACDC_019_ES",
+        "ACDC_028_ED", "ACDC_028_ES", "ACDC_030_ED", "ACDC_030_ES",
+        "ACDC_039_ED", "ACDC_039_ES", "ACDC_045_ED", "ACDC_045_ES",
+        "ACDC_078_ED", "ACDC_078_ES", "ACDC_082_ED", "ACDC_082_ES",
+        "ACDC_085_ED", "ACDC_085_ES", "ACDC_087_ED", "ACDC_087_ES"
+      ],
+      "settings": [
+        "acdc_id",
+        "acdc_photo_source_validation_low",
+        "acdc_photo_source_validation_medium",
+        "acdc_photo_source_validation_response_noise_heavy"
+      ],
+      "seeds": [42, 202607280, 202607281, 202607282]
+    }
+  }
+}

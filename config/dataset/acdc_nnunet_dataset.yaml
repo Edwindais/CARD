@@ -1,0 +1,30 @@
+# ACDC 2D Dataset Configuration (NIfTI -> nnUNet)
+name: acdc_nnunet
+root_dir: ${oc.env:nnUNet_preprocessed}/Dataset002_ACDC/nnUNetPlans_3d_fullres
+val_root_dir: ${oc.env:nnUNet_preprocessed}/Dataset002_ACDC/nnUNetPlans_3d_fullres
+
+# Diffusion model parameters
+diffusion_img_size: 256
+diffusion_depth_size: 1
+image_channels: 1
+mask_classes: 3  # Foreground classes: RV, MYO, LV
+
+# Class definitions
+num_foreground_classes: 3  # RV, MYO, LV
+categorical_use_background: true
+
+# 2D Training Configuration (Pseudo-3D)
+# Format: [D, H, W]
+img_size: [1, 256, 256]
+
+# Batch size for 2D slices
+batch_size: 32
+num_workers: 8
+
+# Split configuration
+split_config:
+  splits_file: splits_final.json
+  splits_fold: 0
+  roi_x: 256
+  roi_y: 256
+  roi_z: 1  # Depth 1 for 2D slices
