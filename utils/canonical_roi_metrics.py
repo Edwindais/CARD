@@ -11,9 +11,7 @@ Metric contract:
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Optional
 
 import numpy as np
 from scipy.ndimage import binary_dilation
@@ -190,39 +188,6 @@ def roi_arrays_from_tensors_slice2d_kernel10_external(
     return probs_roi.numpy().astype(dtype, copy=False), labels_roi.numpy().astype(np.int16, copy=False)
 
 
-def normalize_roi_sample_mode(mode: str | None) -> str:
-    if mode is None:
-        return "kernel10"
-    normalized = str(mode).strip().lower().replace("-", "_")
-    if normalized in {"kernel10", "dilate10", "slice2d_kernel10", "slice2d_kernel10_external"}:
-        return "kernel10"
-    raise ValueError(f"Unknown ROI sample mode {mode!r}; expected kernel10")
-
-
-def roi_arrays_from_tensors_by_mode(
-    probabilities: torch.Tensor,
-    labels: torch.Tensor,
-    *,
-    sample_mode: str = "kernel10",
-    roi_dilation_kernel: int = 10,
-    ignore_index: int = -1,
-    max_pixels: Optional[int] = None,
-    seed: int = 0,
-    dtype: np.dtype = np.float16,
-) -> tuple[str, np.ndarray, np.ndarray]:
-    mode = normalize_roi_sample_mode(sample_mode)
-    probs_roi, labels_roi = roi_arrays_from_tensors_slice2d_kernel10_external(
-        probabilities,
-        labels,
-        roi_dilation_kernel=roi_dilation_kernel,
-        ignore_index=ignore_index,
-        max_pixels=max_pixels,
-        seed=seed,
-        dtype=dtype,
-    )
-    return mode, probs_roi, labels_roi
-
-
 def calibration_from_roi_arrays(
     probs_roi: np.ndarray,
     labels_roi: np.ndarray,
@@ -299,32 +264,3 @@ def calibration_from_roi_arrays(
         "roi_nll": nll,
         "n_roi_pixels": n,
     }
-
-
-def write_roi_samples_npz(
-    path: str | Path,
-    probs_roi: np.ndarray,
-    labels_roi: np.ndarray,
-    *,
-    metadata: Optional[Mapping[str, Any]] = None,
-) -> None:
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    meta = dict(metadata or {})
-    np.savez_compressed(
-        out,
-        probs_roi=np.asarray(probs_roi),
-        labels_roi=np.asarray(labels_roi),
-        metadata_json=np.asarray(json.dumps(meta, sort_keys=True), dtype=object),
-    )
-
-
-def load_roi_samples_npz(path: str | Path) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    payload = np.load(path, allow_pickle=True)
-    probs = payload["probs_roi"]
-    labels = payload["labels_roi"]
-    meta_raw = payload.get("metadata_json")
-    meta: dict[str, Any] = {}
-    if meta_raw is not None:
-        meta = json.loads(str(meta_raw.item()))
-    return probs, labels, meta

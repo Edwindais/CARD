@@ -340,8 +340,6 @@ def _preprocess_one_fixed_test_case(img_path: Path, seg_path: Path, out_dir: Pat
     - output shape (1, D, H, W), transpose order (2, 1, 0)
     - class_locations empty, no bbox field
     """
-    import blosc2
-
     case_name = img_path.name.replace("_0000.nii.gz", "")
 
     nii = nib.load(str(img_path))

@@ -54,10 +54,6 @@ class OneHotCategoricalBCHW(OneHotCategorical):
         # Convert back to channel-first: (B, D, H, W, C) → (B, C, D, H, W)
         return self._channels_second(one_hot.float())
 
-    def prob_sample(self) -> torch.Tensor:
-        """Return probabilities in channel-first layout (self.probs is already channel-first)."""
-        return self.probs
-
     @staticmethod
     def _channels_last(arr: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
         if arr is None:
