@@ -14,6 +14,43 @@ EXPECTED_CENTRE_COUNTS = {"1": 190, "2": 148, "3": 102, "4": 150, "5": 100}
 EXPECTED_SPLIT_COUNTS = {"train": 482, "val": 103, "test": 105}
 
 
+def robust_zscore_normalize(
+    image,
+    label,
+    percentile_low: float = 0.5,
+    percentile_high: float = 99.5,
+):
+    """Apply the per-volume M&Ms normalization used by the evaluation data."""
+    import numpy as np
+
+    image = np.asarray(image, dtype=np.float32)
+    label = np.asarray(label)
+    foreground = label > 0
+    if foreground.sum() < 100:
+        foreground = image > 0
+
+    if foreground.sum() >= 100:
+        p_low, p_high = np.percentile(
+            image[foreground], [percentile_low, percentile_high]
+        )
+        clipped = np.clip(image, p_low, p_high)
+    else:
+        p_low, p_high = float(image.min()), float(image.max())
+        clipped = image
+
+    mean = float(clipped.mean())
+    std = float(clipped.std())
+    if std < 1e-8:
+        std = 1.0
+    normalized = ((clipped - mean) / std).astype(np.float32)
+    return normalized, {
+        "p_low": float(p_low),
+        "p_high": float(p_high),
+        "mean": mean,
+        "std": std,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-root", type=Path, required=True)
@@ -131,6 +168,8 @@ def convert_cases(case_roots: list[Path], output_dir: Path) -> list[str]:
         label_nii = nib.load(label_path)
         image_array = np.ascontiguousarray(image_nii.get_fdata().astype(np.float32))
         label_array = np.ascontiguousarray(label_nii.get_fdata().astype(np.uint8))
+        image_array, normalization_params = robust_zscore_normalize(image_array, label_array)
+        image_array = np.ascontiguousarray(image_array)
         centre = case_root.parent.name
         case_name = f"MNM_{centre}_{case_root.name}"
         properties = {
@@ -140,6 +179,8 @@ def convert_cases(case_roots: list[Path], output_dir: Path) -> list[str]:
             "shape": image_array.shape,
             "patient_id": case_root.name,
             "vendor": centre,
+            "preprocessing": "robust_zscore_percentile_clip",
+            "normalization_params": normalization_params,
         }
         with (output_dir / f"{case_name}.pkl").open("wb") as handle:
             pickle.dump(properties, handle)

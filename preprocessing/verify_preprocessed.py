@@ -88,6 +88,20 @@ def verify_cardiac(work_root: Path) -> None:
         properties = pickle.load(handle)
     if not np.allclose(properties["spacing"], TARGET_SPACING):
         raise RuntimeError(f"M&Ms spacing does not match {TARGET_SPACING}")
+    for centre in sorted(EXPECTED_CENTRE_COUNTS):
+        centre_name = next(name for name in mnm_names if name.split("_")[1] == centre)
+        with (mnm_data / f"{centre_name}.pkl").open("rb") as handle:
+            properties = pickle.load(handle)
+        if properties.get("preprocessing") != "robust_zscore_percentile_clip":
+            raise RuntimeError(f"M&Ms normalization metadata is missing for centre {centre}")
+        image = np.asarray(properties["data"], dtype=np.float32)
+        labels = np.asarray(properties["seg"])
+        if not np.isclose(float(image.mean()), 0.0, atol=1e-5):
+            raise RuntimeError(f"M&Ms centre {centre} image is not zero-mean")
+        if not np.isclose(float(image.std()), 1.0, atol=1e-5):
+            raise RuntimeError(f"M&Ms centre {centre} image is not unit-variance")
+        if not set(np.unique(labels)).issubset({0, 1, 2, 3}):
+            raise RuntimeError(f"M&Ms centre {centre} contains invalid labels")
 
 
 def main() -> None:

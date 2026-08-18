@@ -70,6 +70,8 @@ bash scripts/01_preprocess.sh /path/to/ACDC /path/to/MNM "$WORK"
 
 The command creates `nnUNet_raw/`, `nnUNet_preprocessed/`, and
 `nnUNet_results/` below `$WORK`, then checks the expected splits and data layout.
+ACDC and M&Ms are normalized per volume with z-score normalization; M&Ms uses
+foreground percentile clipping before standardization.
 
 ### 2. Download the models
 
