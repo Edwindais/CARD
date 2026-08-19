@@ -109,6 +109,8 @@ Dice, ROI-ECE, ROI-SCE, ROI-ACE, and ROI-NLL values are written to
 per-slice external kernel-10 ROI.
 ACDC-C is averaged over Clean, Bias, Motion, Ghosting, and Spike; M&Ms is
 averaged over scanner vendors A, B, C, and D.
+Each ACDC-C artifact is sampled once per 3D phase and shared by all slices from
+that phase.
 
 ## Expected results
 
@@ -117,7 +119,7 @@ reported in percent.
 
 | Dataset | Dice ↑ | ROI-ECE ↓ | ROI-SCE ↓ | ROI-ACE ↓ | ROI-NLL ↓ |
 |---|---:|---:|---:|---:|---:|
-| ACDC-C | 0.8763 | 5.41 | 3.36 | 3.12 | 0.371 |
+| ACDC-C | 0.8536 | 6.37 | 3.87 | 3.65 | 0.405 |
 | M&Ms | 0.7865 | 5.96 | 3.79 | 3.50 | 0.436 |
 
 ## Optional model training

@@ -216,7 +216,15 @@ class ACDC_C_TorchIO_Dataset(ACDC_nnUNet_Dataset):
         if mask.ndim == 3:
             mask = mask.unsqueeze(0)
 
-        item_seed = self.base_seed + hash((case_idx, slice_idx)) % (2**31)
+        # Structural ACDC-C artifacts use one deterministic seed per full case
+        # volume; source-validation photometric augmentation keeps the legacy
+        # (case_idx, slice_idx) seed below.
+        artifact_mode = self.artifact_transform is not None
+        item_seed = (
+            self.base_seed + case_idx
+            if artifact_mode
+            else self.base_seed + hash((case_idx, slice_idx)) % (2**31)
+        )
         torch.manual_seed(item_seed)
         np.random.seed(item_seed % (2**31))
 
@@ -238,6 +246,9 @@ class ACDC_C_TorchIO_Dataset(ACDC_nnUNet_Dataset):
         mask_slice = mask[:, slice_idx:slice_idx+1, :, :]
 
         if self.photometric_config is not None:
+            photometric_seed = self.base_seed + hash((case_idx, slice_idx)) % (2**31)
+            torch.manual_seed(photometric_seed)
+            np.random.seed(photometric_seed % (2**31))
             img_slice = self._apply_source_validation_augmentation(img_slice, self.photometric_config)
 
         # Apply any additional transforms from parent
