@@ -70,8 +70,9 @@ bash scripts/01_preprocess.sh /path/to/ACDC /path/to/MNM "$WORK"
 
 The command creates `nnUNet_raw/`, `nnUNet_preprocessed/`, and
 `nnUNet_results/` below `$WORK`, then checks the expected splits and data layout.
-ACDC and M&Ms are normalized per volume with z-score normalization; M&Ms uses
-foreground percentile clipping before standardization.
+ACDC and M&Ms are normalized per volume with z-score normalization.
+M&Ms images and labels are resampled to `1.25 x 1.25 x 10 mm` with linear and
+nearest-neighbor interpolation, respectively, and aligned to the ACDC convention.
 
 ### 2. Download the models
 
@@ -104,7 +105,8 @@ bash scripts/04_test.sh "$WORK/nnUNet_preprocessed" "$OUTPUT"
 
 Per-case metrics are saved under `$OUTPUT/test/metrics/`. The final group-equal
 Dice, ROI-ECE, ROI-SCE, ROI-ACE, and ROI-NLL values are written to
-`$OUTPUT/test/summary/summary.csv`.
+`$OUTPUT/test/summary/summary.csv`. All calibration metrics use the same
+per-slice external kernel-10 ROI.
 ACDC-C is averaged over Clean, Bias, Motion, Ghosting, and Spike; M&Ms is
 averaged over scanner vendors A, B, C, and D.
 
@@ -116,7 +118,7 @@ reported in percent.
 | Dataset | Dice ↑ | ROI-ECE ↓ | ROI-SCE ↓ | ROI-ACE ↓ | ROI-NLL ↓ |
 |---|---:|---:|---:|---:|---:|
 | ACDC-C | 0.8763 | 5.41 | 3.36 | 3.12 | 0.371 |
-| M&Ms | 0.7689 | 4.98 | 3.19 | 2.93 | 0.377 |
+| M&Ms | 0.7865 | 5.96 | 3.79 | 3.50 | 0.436 |
 
 ## Optional model training
 

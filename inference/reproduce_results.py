@@ -27,7 +27,6 @@ from model.ddpm import CategoricalDiffusion
 from train import create_denoising_model
 from utils.canonical_roi_metrics import (
     calibration_from_roi_arrays,
-    roi_arrays_from_tensors_slice2d,
     roi_arrays_from_tensors_slice2d_kernel10_external,
 )
 
@@ -49,6 +48,19 @@ def require_torchio_version(version: str | None = None) -> None:
     actual = version or torchio.__version__
     if actual != "1.2.0":
         raise RuntimeError(f"ACDC-C evaluation requires TorchIO 1.2.0, found {actual}.")
+
+
+def require_mnm_preprocessed_contract(root: Path) -> None:
+    marker = root / "MNM_PREALIGNED.json"
+    if not marker.is_file():
+        raise RuntimeError(f"M&Ms preprocessing contract marker not found: {marker}")
+    payload = json.loads(marker.read_text(encoding="utf-8"))
+    if payload.get("preprocessing") != "uniform_resample_full_volume_zscore_acdc_aligned":
+        raise RuntimeError(f"Invalid M&Ms preprocessing contract: {marker}")
+    if int(payload.get("case_count", -1)) != 690:
+        raise RuntimeError(f"Invalid M&Ms case count in {marker}")
+    if payload.get("roi_sample_mode") != "slice2d_kernel10_external":
+        raise RuntimeError(f"Invalid M&Ms ROI contract in {marker}")
 
 
 def _plans_dir(dataset_root: Path) -> Path:
@@ -119,20 +131,18 @@ def _finish_case(case_id: str, slices: list[tuple[int, np.ndarray, np.ndarray]],
     labels = np.stack([item[2] for item in ordered], axis=0)  # D,H,W
     prob_tensor = torch.from_numpy(probs).unsqueeze(0)
     label_tensor = torch.from_numpy(labels).unsqueeze(0)
-    if meta["roi_sample_mode"] == "slice2d":
-        probs_roi, labels_roi = roi_arrays_from_tensors_slice2d(
-            prob_tensor, label_tensor, roi_dilation_kernel=10, dtype=np.float16,
-        )
-    else:
-        probs_roi, labels_roi = roi_arrays_from_tensors_slice2d_kernel10_external(
-            prob_tensor, label_tensor, roi_dilation_kernel=10, dtype=np.float16,
-        )
+    if meta["roi_sample_mode"] != "slice2d_kernel10_external":
+        raise RuntimeError(f"Unsupported ROI sample mode: {meta['roi_sample_mode']}")
+    probs_roi, labels_roi = roi_arrays_from_tensors_slice2d_kernel10_external(
+        prob_tensor, label_tensor, roi_dilation_kernel=10, dtype=np.float16,
+    )
     metrics = calibration_from_roi_arrays(probs_roi, labels_roi, num_bins=10)
     pred = probs.argmax(axis=0)
     public_case_id = f"{meta['scanner']}__{case_id}" if meta.get("scanner") else case_id
+    safe_group = str(meta["reporting_group"]).replace("/", "_").replace("\\", "_").replace(" ", "_")
     sample_dir = output_dir / "roi_samples"
     sample_dir.mkdir(parents=True, exist_ok=True)
-    sample_path = sample_dir / f"{public_case_id}__roi_kernel10.npz"
+    sample_path = sample_dir / f"{safe_group}__{public_case_id}__roi_kernel10.npz"
     np.savez_compressed(sample_path, probs_roi=probs_roi, labels_roi=labels_roi)
     return {
         **meta, "case_id": public_case_id, "dice": _dice(pred, labels, probs.shape[0]),
@@ -140,7 +150,7 @@ def _finish_case(case_id: str, slices: list[tuple[int, np.ndarray, np.ndarray]],
     }
 
 
-def infer_dataset(diffusion, reference_diffusion, dataset, meta: dict, tuple_params: dict, args, *, mnm_orientation=False):
+def infer_dataset(diffusion, reference_diffusion, dataset, meta: dict, tuple_params: dict, args):
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers, collate_fn=data_collate)
     rows, current_case, current_slices = [], None, []
     device = next(diffusion.parameters()).device
@@ -152,11 +162,6 @@ def infer_dataset(diffusion, reference_diffusion, dataset, meta: dict, tuple_par
                 images = images.squeeze(2)
             if labels.ndim == 5:
                 labels = labels.squeeze(2)
-            if mnm_orientation:
-                images = torch.rot90(torch.flip(images, dims=[-1]), k=1, dims=[-2, -1])
-                labels = labels.clone()
-                one, three = labels == 1, labels == 3
-                labels[one], labels[three] = 3, 1
             output = diffusion.sample_full_tac(
                 channel_cond=images,
                 reference_denoise_fn=reference_diffusion.denoise_fn,
@@ -167,8 +172,6 @@ def infer_dataset(diffusion, reference_diffusion, dataset, meta: dict, tuple_par
                 w_b=tuple_params["w_b"], w_k=tuple_params["w_k"],
             )
             probs = output["probabilities"]
-            if mnm_orientation:
-                probs = torch.flip(torch.rot90(probs, k=-1, dims=[-2, -1]), dims=[-1])
             probs_np = probs.float().cpu().numpy()
             labels_np = labels.cpu().numpy()
             names = batch["name"]
@@ -197,10 +200,10 @@ def make_jobs(args):
         os.environ["nnUNet_preprocessed"] = str(args.cardiac_root)
         root = _plans_dir(args.cardiac_root / "Dataset002_ACDC")
         for condition in ("Clean", "Bias", "Motion", "Ghosting", "Spike"):
-            yield ACDC_C_TorchIO_Dataset(root_dir=str(root), mode="test", corruption_type=condition, severity=1, seed=42, **common), {"display_block": "ACDC-C", "reporting_group": condition, "roi_sample_mode": "slice2d_kernel10_external"}, False
+            yield ACDC_C_TorchIO_Dataset(root_dir=str(root), mode="test", corruption_type=condition, severity=1, seed=42, **common), {"display_block": "ACDC-C", "reporting_group": condition, "roi_sample_mode": "slice2d_kernel10_external"}
     elif args.block == "mnm":
         for vendor in "ABCD":
-            yield MNM_nnUNet_Dataset(str(args.mnm_root), vendor, args.max_cases), {"display_block": "M&Ms", "reporting_group": vendor, "roi_sample_mode": "slice2d"}, True
+            yield MNM_nnUNet_Dataset(str(args.mnm_root), vendor, args.max_cases), {"display_block": "M&Ms", "reporting_group": vendor, "roi_sample_mode": "slice2d_kernel10_external"}
 
 
 def main() -> None:
@@ -227,7 +230,10 @@ def main() -> None:
         required=True,
     )
     args = parser.parse_args()
-    require_torchio_version()
+    if args.block == "acdc-c":
+        require_torchio_version()
+    elif args.block == "mnm":
+        require_mnm_preprocessed_contract(args.mnm_root)
     if not torch.cuda.is_available() and args.device.startswith("cuda"):
         raise RuntimeError("CUDA is required for CARD inference")
 
@@ -255,7 +261,7 @@ def main() -> None:
     args.reference_cond_scale = 0.8
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows = []
-    for dataset, meta, mnm_orientation in make_jobs(args):
+    for dataset, meta in make_jobs(args):
         rows.extend(
             infer_dataset(
                 primary_model,
@@ -264,7 +270,6 @@ def main() -> None:
                 meta,
                 tuple_params,
                 args,
-                mnm_orientation=mnm_orientation,
             )
         )
     output = args.output_dir / "per_case_metrics.csv"

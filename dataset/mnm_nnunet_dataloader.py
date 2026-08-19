@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import glob
 import os
 import pickle
 
@@ -16,10 +15,14 @@ VENDOR_MAPPING = {"A": ("1", "5"), "B": ("2",), "C": ("3",), "D": ("4", "6")}
 
 
 class MNM_nnUNet_Dataset(ACDC_nnUNet_Dataset):
+    case_prefix = "MNM_"
+    dataset_label = "M&Ms"
+
     def __init__(self, root_dir: str, target_vendor: str, max_cases: int | None = None):
         if target_vendor not in VENDOR_MAPPING:
             raise ValueError(f"Unknown M&Ms vendor: {target_vendor}")
         self.target_vendor = target_vendor
+        self.max_cases = max_cases
         super().__init__(
             root_dir=root_dir,
             mode="test",
@@ -27,17 +30,23 @@ class MNM_nnUNet_Dataset(ACDC_nnUNet_Dataset):
             categorical_use_background=True,
             split_config={"roi_z": 1, "roi_y": 256, "roi_x": 256},
         )
-        if max_cases is not None:
-            self.file_names = self.file_names[:max_cases]
-            self.slice_mapping = []
-            self._scan_slices()
-
     def get_file_names(self):
-        case_paths = sorted(glob.glob(os.path.join(self.nnunet_preprocessed_dir, "MNM_*.pkl")))
+        case_paths = super().get_file_names()
         vendor_ids = VENDOR_MAPPING[self.target_vendor]
         selected = [path for path in case_paths if os.path.basename(path).split("_")[1] in vendor_ids]
         if not selected:
             raise RuntimeError(f"No M&Ms cases found for vendor {self.target_vendor}")
+        if self.max_cases is not None:
+            stratified = []
+            for centre in vendor_ids:
+                centre_cases = [
+                    path for path in selected
+                    if os.path.basename(path).split("_")[1] == centre
+                ]
+                if centre_cases:
+                    stratified.append(centre_cases[0])
+            stratified.extend(path for path in selected if path not in stratified)
+            selected = stratified[: self.max_cases]
         return selected
 
     def load_nnUNet_data(self, pkl_file: str):

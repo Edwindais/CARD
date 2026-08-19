@@ -14,7 +14,6 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
-from scipy.ndimage import binary_dilation
 
 try:
     import torch
@@ -77,50 +76,6 @@ def dilated_foreground_roi_external2d(
     return dilated[:, 0].gt(0.5)
 
 
-def roi_arrays_from_tensors_slice2d(
-    probabilities: torch.Tensor,
-    labels: torch.Tensor,
-    *,
-    roi_dilation_kernel: int = 10,
-    ignore_index: int = -1,
-    dtype: np.dtype = np.float16,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Extract slice-wise ROI arrays from batched M&Ms probabilities and labels."""
-    _require_torch()
-    if probabilities.ndim != 5:
-        raise ValueError(f"Expected probabilities with 5 dims, got {probabilities.shape}")
-
-    bsz, channels, depth, height, width = probabilities.shape
-    label_spatial = labels.detach()
-    if label_spatial.ndim == 5 and label_spatial.shape[1] == 1:
-        label_spatial = label_spatial[:, 0]
-    label_spatial = label_spatial.long()
-    if label_spatial.shape != (bsz, depth, height, width):
-        raise ValueError(
-            "Label/probability spatial shape mismatch for M&Ms slice ROI: "
-            f"probs={tuple(probabilities.shape)}, labels={tuple(label_spatial.shape)}"
-        )
-
-    labels_np = label_spatial.cpu().numpy()
-    roi_mask = np.zeros_like(labels_np, dtype=bool)
-    for batch_index in range(bsz):
-        for slice_index in range(depth):
-            foreground = labels_np[batch_index, slice_index] > 0
-            if foreground.any():
-                roi_mask[batch_index, slice_index] = binary_dilation(
-                    foreground, iterations=roi_dilation_kernel,
-                )
-
-    probs_spatial = probabilities.detach().float().permute(0, 2, 3, 4, 1).cpu().numpy()
-    probs_roi = probs_spatial[roi_mask]
-    labels_roi = labels_np[roi_mask]
-    valid = (labels_roi != ignore_index) & (labels_roi >= 0) & (labels_roi < channels)
-    return (
-        probs_roi[valid].astype(dtype, copy=False),
-        labels_roi[valid].astype(np.int16, copy=False),
-    )
-
-
 def roi_arrays_from_tensors_slice2d_kernel10_external(
     probabilities: torch.Tensor,
     labels: torch.Tensor,
@@ -152,7 +107,15 @@ def roi_arrays_from_tensors_slice2d_kernel10_external(
             )
     else:
         bsz, channels, depth, height, width = probabilities.shape
-        label_spatial = _as_label_tensor(labels)
+        label_spatial = labels.detach()
+        if label_spatial.ndim == 5 and label_spatial.shape[1] == 1:
+            label_spatial = label_spatial[:, 0]
+        if label_spatial.ndim != 4:
+            raise ValueError(
+                "5D probabilities require labels with shape (B,D,H,W) or (B,1,D,H,W), "
+                f"got {tuple(labels.shape)}"
+            )
+        label_spatial = label_spatial.long()
         if label_spatial.shape[0] != bsz or label_spatial.shape[1:] != (depth, height, width):
             raise ValueError(
                 "Label/probability spatial shape mismatch for 2D kernel ROI: "

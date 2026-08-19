@@ -22,11 +22,14 @@ SELECTION_RESULT="${PIPELINE_ROOT}/selection/selected_tuple.json"
 OUT_ROOT="${OUT_ROOT:-${PIPELINE_ROOT}/test}"
 TUPLES_FILE="${OUT_ROOT}/selected_tuple.json"
 MNM_ROOT="${PREPROCESSED_ROOT}/MNM/nnUNetPlans_3d_fullres"
+WORK_ROOT="$(dirname "${PREPROCESSED_ROOT%/}")"
 
 for path in "${PRIMARY_CHECKPOINT}" "${REFERENCE_CHECKPOINT}" "${SELECTION_RESULT}"; do
   [[ -f "${path}" ]] || { echo "ERROR: required file not found: ${path}" >&2; exit 2; }
 done
 [[ -d "${MNM_ROOT}" ]] || { echo "ERROR: preprocessed M&Ms data not found: ${MNM_ROOT}" >&2; exit 2; }
+"${PYTHON_BIN}" "${PACKAGE_ROOT}/preprocessing/verify_preprocessed.py" \
+  --work-root "${WORK_ROOT}" --mnm-only
 
 "${PYTHON_BIN}" "${PACKAGE_ROOT}/evaluation/assemble_selected_tuples.py" \
   --cardiac "${SELECTION_RESULT}" --output "${TUPLES_FILE}"
