@@ -119,8 +119,8 @@ reported in percent.
 
 | Dataset | Dice ↑ | ROI-ECE ↓ | ROI-SCE ↓ | ROI-ACE ↓ | ROI-NLL ↓ |
 |---|---:|---:|---:|---:|---:|
-| ACDC-C | 0.8536 | 6.37 | 3.87 | 3.65 | 0.405 |
-| M&Ms | 0.7865 | 5.96 | 3.79 | 3.50 | 0.436 |
+| ACDC-C | 0.8536 | 6.35 | 3.87 | 3.65 | 0.405 |
+| M&Ms | 0.7865 | 5.94 | 3.78 | 3.50 | 0.437 |
 
 ## Optional model training
 
